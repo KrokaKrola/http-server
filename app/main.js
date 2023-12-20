@@ -2,8 +2,8 @@ const net = require('net');
 const fs = require('fs');
 const nodePath = require('path');
 
-const buildResponse = (content, contentType = 'text/plain') => {
-    const statusLine = 'HTTP/1.1 200 OK\r\n';
+const buildResponse = (content, contentType = 'text/plain', status = 200) => {
+    const statusLine = `HTTP/1.1 ${status} OK\r\n`;
     const headers = `Content-Type: ${contentType}\r\nContent-Length: ${content.length}\r\n\r\n`;
 
     return statusLine + headers + content;
@@ -22,11 +22,20 @@ const readFileAsync = (path) => {
     })
 }
 
+const writeFileAsync = (path, data) => {
+    return new Promise((resolve, reject) => {
+        fs.writeFile(path, data, (err) => {
+            if (err) reject(err);
+            else resolve();
+        });
+    })
+}
+
 const server = net.createServer((socket) => {
     socket.on('data', async (data) => {
         const requestData = data.toString();
         const [requestLine, ...headers] = requestData.split('\r\n');
-        const [_method, path, _httpVersion] = requestLine.split(' ');
+        const [method, path, _httpVersion] = requestLine.split(' ');
 
         if (path === '/') {
             socket.write('HTTP/1.1 200 OK\r\n\r\n');
@@ -41,7 +50,7 @@ const server = net.createServer((socket) => {
 
             const response = buildResponse(userAgent);
             socket.write(response);
-        } else if (path.startsWith('/files')) {
+        } else if (path.startsWith('/files') && method === 'GET') {
             const directory = process.argv.slice(2)[1];
 
             const fileName = path.replace(/^\/files\//, '');
@@ -52,6 +61,18 @@ const server = net.createServer((socket) => {
             } catch (err) {
                 socket.write(getNotFoundResponse());
                 socket.end();
+            }
+        } else if (path.startsWith('/files') && method === 'POST') {
+            const directory = process.argv.slice(2)[1];
+            const fileName = path.replace(/^\/files\//, '');
+
+            const body = headers[headers.length - 1];
+
+            try {
+                await writeFileAsync(nodePath.join(directory, fileName), body);
+                socket.write(buildResponse('', 'text/plain', 201));
+            } catch (err) {
+                socket.write(getNotFoundResponse());
             }
         } else {
             socket.write(getNotFoundResponse());
