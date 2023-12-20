@@ -10,9 +10,7 @@ const buildResponse = (content) => {
 const server = net.createServer((socket) => {
   socket.on('data', (data) => {
     const requestData = data.toString();
-
     const [requestLine, ...headers] = requestData.split('\r\n');
-
     const [_method, path, _httpVersion] = requestLine.split(' ');
 
     if (path === '/') {
