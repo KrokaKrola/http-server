@@ -6,7 +6,6 @@ const server = net.createServer((socket) => {
   });
 
   socket.on('close', () => {
-    console.log('client disconnected');
     socket.end();
     server.close();
   });
