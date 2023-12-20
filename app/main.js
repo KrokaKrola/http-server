@@ -13,8 +13,17 @@ const getNotFoundResponse = () => {
     return 'HTTP/1.1 404 Not Found\r\n\r\n';
 }
 
+const readFileAsync = (path) => {
+    return new Promise((resolve, reject) => {
+        fs.readFile(path, (err, data) => {
+            if (err) reject(err);
+            else resolve(data);
+        });
+    })
+}
+
 const server = net.createServer((socket) => {
-    socket.on('data', (data) => {
+    socket.on('data', async (data) => {
         const requestData = data.toString();
         const [requestLine, ...headers] = requestData.split('\r\n');
         const [_method, path, _httpVersion] = requestLine.split(' ');
@@ -33,18 +42,17 @@ const server = net.createServer((socket) => {
             const response = buildResponse(userAgent);
             socket.write(response);
         } else if (path.startsWith('/files')) {
-            const directoryArg = process.argv.slice(2)[0];
-            const directory = directoryArg.replace('--directory=', '');
+            const directory = process.argv.slice(2)[1];
 
             const fileName = path.replace(/^\/files\//, '');
-            fs.readFile(nodePath.join(directory, fileName), (err, data) => {
-                if (err) {
-                    socket.write(getNotFoundResponse());
-                } else {
-                    const response = buildResponse(data.toString(), 'application/octet-stream');
-                    socket.write(response);
-                }
-            });
+            try {
+                const data = await readFileAsync(nodePath.join(directory, fileName));
+                const response = buildResponse(data.toString(), 'application/octet-stream');
+                socket.write(response);
+            } catch (err) {
+                socket.write(getNotFoundResponse());
+                socket.end();
+            }
         } else {
             socket.write(getNotFoundResponse());
         }
